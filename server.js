@@ -12,7 +12,7 @@ const User = require("./models/User");
 const Crop = require("./models/Crop");
 const chatRoutes = require("./routes/chat");
 const auctionRoutes = require("./routes/auction");
-const bidRoutes = require("./routes/bid"); // Ensure your route file is named bid.js
+const bidRoutes = require("./routes/bid"); 
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -20,7 +20,10 @@ const PORT = process.env.PORT || 5000;
 // 1. Create HTTP Server for Socket.io
 const server = http.createServer(app);
 const io = require("socket.io")(server, {
-  cors: { origin: "*" }
+  cors: { 
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
 });
 
 app.set("io", io); // Make io accessible in routes
@@ -49,7 +52,7 @@ const upload = multer({ storage });
 // Routes
 app.use("/api/chat", chatRoutes);
 app.use("/api/auction", auctionRoutes);
-app.use("/api/bid", bidRoutes); // Bidding logic
+app.use("/api/bid", bidRoutes); 
 
 // Auth endpoints
 app.post("/api/signup", async (req, res) => {
@@ -111,9 +114,12 @@ app.get("/api/dealer/crops", async (req, res) => {
   res.json(crops);
 });
 
+// 3. Connect to DB and Start Server
 mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log("MongoDB Connected"))
-  .catch(err => console.error(err));
-
-// 3. Listen using 'server', not 'app'
-server.listen(PORT, () => console.log(`Server running on http://localhost:${PORT}`));
+  .then(() => {
+    console.log("MongoDB Connected");
+    server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  })
+  .catch(err => {
+    console.error("Connection error", err);
+  });

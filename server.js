@@ -6,6 +6,7 @@ const bcrypt = require("bcryptjs");
 const multer = require("multer");
 const path = require("path");
 const http = require("http");
+const fs = require("fs"); 
 
 // Models & routes
 const User = require("./models/User");
@@ -13,6 +14,12 @@ const Crop = require("./models/Crop");
 const chatRoutes = require("./routes/chat");
 const auctionRoutes = require("./routes/auction");
 const bidRoutes = require("./routes/bid"); 
+
+// Ensure uploads folder exists before starting
+const uploadDir = path.join(__dirname, "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -26,7 +33,7 @@ const io = require("socket.io")(server, {
   }
 });
 
-app.set("io", io); // Make io accessible in routes
+app.set("io", io); 
 
 app.use(cors());
 app.use(express.json());
@@ -42,10 +49,13 @@ io.on("connection", (socket) => {
   });
 });
 
-// Multer setup
+// Updated Multer setup for unique filenames
 const storage = multer.diskStorage({
-  destination: "uploads/",
-  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname)),
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
 });
 const upload = multer({ storage });
 
@@ -81,9 +91,12 @@ app.post("/api/signin", async (req, res) => {
   }
 });
 
+// Updated Crop Upload Route with validation and logging
 app.post("/api/farmer/crops", upload.single("image"), async (req, res) => {
   try {
     const farmer = await User.findById(req.body.farmerId);
+    if (!farmer) return res.status(404).json({ message: "Farmer not found" });
+
     const crop = new Crop({
       farmerId: farmer._id,
       farmerName: farmer.name,
@@ -97,10 +110,12 @@ app.post("/api/farmer/crops", upload.single("image"), async (req, res) => {
       status: "pending",
       bids: [],
     });
+
     await crop.save();
-    res.json({ message: "Crop uploaded", crop });
+    res.json({ message: "Crop uploaded successfully", crop });
   } catch (err) {
-    res.status(500).json({ message: "Crop upload failed" });
+    console.error("Backend Upload Error:", err); 
+    res.status(500).json({ message: "Crop upload failed", error: err.message });
   }
 });
 

@@ -33,15 +33,18 @@ router.get("/bids/:cropId", async (req, res) => {
   }
 });
 
-// Update the bid end time (The "Update Schedule" fix)
+// Update the bid end time to match your Model's "bidEndTime"
 router.put("/update-time/:cropId", async (req, res) => {
   const { cropId } = req.params;
-  const { bidTime } = req.body; // Ensure this matches your Frontend body key!
+  const { bidEndTime } = req.body; // Change this to bidEndTime
 
   try {
     const updatedCrop = await Crop.findByIdAndUpdate(
       cropId,
-      { bidTime: bidTime }, // This must match the field name in your Crop Model
+      { 
+        bidEndTime: bidEndTime, // Matching the schema field
+        status: "open"          // Usually, setting a time means the auction is now "open"
+      }, 
       { new: true }
     );
 
@@ -49,9 +52,8 @@ router.put("/update-time/:cropId", async (req, res) => {
       return res.status(404).json({ message: "Crop not found" });
     }
 
-    // Optional: Emit socket event if you want it to update for everyone instantly
     const io = req.app.get("io");
-    io.to(cropId).emit("bidTimeUpdated", { cropId, newTime: bidTime });
+    if (io) io.to(cropId).emit("bidTimeUpdated", { cropId, newTime: bidEndTime });
 
     res.json({ message: "Bid time updated successfully", updatedCrop });
   } catch (err) {

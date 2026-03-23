@@ -35,7 +35,11 @@ const io = require("socket.io")(server, {
 
 app.set("io", io); 
 
-app.use(cors());
+app.use(cors({
+  origin: ["https://agrosetu-frontend.vercel.app", "http://localhost:3000"],
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
@@ -58,7 +62,9 @@ const storage = multer.diskStorage({
   },
 });
 const upload = multer({ storage });
-
+app.get("/", (req, res) => {
+  res.status(200).json({ status: "success", message: "AgroSetu Backend is Live!" });
+});
 // Routes
 app.use("/api/chat", chatRoutes);
 app.use("/api/auction", auctionRoutes);

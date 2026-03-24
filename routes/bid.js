@@ -42,7 +42,7 @@ router.put("/update-time/:cropId", async (req, res) => {
     const updatedCrop = await Crop.findByIdAndUpdate(
       cropId,
       { 
-        bidEndTime: bidEndTime, // Matching the schema field
+        bidEndTime: new Date(bidEndTime), // Matching the schema field
         status: "open"          // Usually, setting a time means the auction is now "open"
       }, 
       { new: true }

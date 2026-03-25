@@ -105,6 +105,9 @@ app.post("/api/farmer/crops", upload.single("image"), async (req, res) => {
     const farmer = await User.findById(req.body.farmerId);
     if (!farmer) return res.status(404).json({ message: "Farmer not found" });
 
+    // Store the path without a leading slash for better compatibility with frontend API_URL
+    const cropImagePath = req.file ? `uploads/${req.file.filename}` : "";
+
     const crop = new Crop({
       farmerId: farmer._id,
       farmerName: farmer.name,
@@ -113,8 +116,8 @@ app.post("/api/farmer/crops", upload.single("image"), async (req, res) => {
       cropType: farmer.cropType,
       cropName: req.body.cropName,
       quantity: req.body.quantity,
-      price: req.body.price, // Handled as string for compatibility
-      imageUrl: req.file ? `/uploads/${req.file.filename}` : "",
+      price: req.body.price, 
+      imageUrl: cropImagePath,
       status: "pending",
       bids: [],
     });

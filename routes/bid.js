@@ -39,6 +39,7 @@ router.put("/update-time/:cropId", async (req, res) => {
   const { bidEndTime } = req.body;
 
   try {
+    // 1. Update the crop with the new date and open the status
     const updatedCrop = await Crop.findByIdAndUpdate(
       cropId,
       { 
@@ -52,20 +53,22 @@ router.put("/update-time/:cropId", async (req, res) => {
       return res.status(404).json({ message: "Crop not found" });
     }
 
-    // Socket.io emission
+    // 2. Safe Socket.io emission
     try {
-        const io = req.app.get("io");
-        if (io) io.to(cropId).emit("bidTimeUpdated", { cropId, newTime: bidEndTime });
+      const io = req.app.get("io");
+      if (io) {
+        io.to(cropId).emit("bidTimeUpdated", { cropId, newTime: bidEndTime });
+      }
     } catch (socketErr) {
-        console.error("Socket error:", socketErr);
+      console.error("Socket error (non-fatal):", socketErr);
     }
 
-    // SUCCESS RESPONSE (Fixed this line)
-    res.json({ message: "Bid time updated successfully", updatedCrop });
+    // 3. SEND SUCCESS RESPONSE
+    return res.json({ message: "Auction schedule updated successfully!", updatedCrop });
 
   } catch (err) {
     console.error("Update Bid Time Error:", err);
-    res.status(500).json({ message: "Server error while updating bid time" });
+    return res.status(500).json({ message: "Server error while updating bid time", error: err.message });
   }
 });
 

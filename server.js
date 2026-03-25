@@ -8,14 +8,12 @@ const path = require("path");
 const http = require("http");
 const fs = require("fs"); 
 
-// Models & routes
 const User = require("./models/User");
 const Crop = require("./models/Crop");
 const chatRoutes = require("./routes/chat");
 const auctionRoutes = require("./routes/auction");
 const bidRoutes = require("./routes/bid"); 
 
-// Ensure uploads folder exists before starting
 const uploadDir = path.join(__dirname, "uploads");
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir);
@@ -24,25 +22,27 @@ if (!fs.existsSync(uploadDir)) {
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// 1. Create HTTP Server for Socket.io
+// 1. Create HTTP Server and Socket.io
 const server = http.createServer(app);
 const io = require("socket.io")(server, {
   cors: { 
-    origin: "*",
-    methods: ["GET", "POST"]
+    origin: ["https://agrosetu-frontend.vercel.app", "http://localhost:3000"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
   }
 });
 
+// CRITICAL: Set 'io' BEFORE routes so they can access it
 app.set("io", io); 
 
-// Add "OPTIONS" to the methods array
 app.use(cors({
   origin: ["https://agrosetu-frontend.vercel.app", "http://localhost:3000"],
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], 
   credentials: true
 }));
 
-app.use(express.json());
+// Increased limit for high-res crop photos
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ limit: "10mb", extended: true }));
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // 2. Socket Room Logic
@@ -55,7 +55,6 @@ io.on("connection", (socket) => {
   });
 });
 
-// Updated Multer setup for unique filenames
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, "uploads/"),
   filename: (req, file, cb) => {
@@ -64,15 +63,17 @@ const storage = multer.diskStorage({
   },
 });
 const upload = multer({ storage });
+
 app.get("/", (req, res) => {
   res.status(200).json({ status: "success", message: "AgroSetu Backend is Live!" });
 });
+
 // Routes
 app.use("/api/chat", chatRoutes);
 app.use("/api/auction", auctionRoutes);
 app.use("/api/bid", bidRoutes); 
 
-// Auth endpoints
+// Auth
 app.post("/api/signup", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -99,7 +100,6 @@ app.post("/api/signin", async (req, res) => {
   }
 });
 
-// Updated Crop Upload Route with validation and logging
 app.post("/api/farmer/crops", upload.single("image"), async (req, res) => {
   try {
     const farmer = await User.findById(req.body.farmerId);
@@ -113,7 +113,7 @@ app.post("/api/farmer/crops", upload.single("image"), async (req, res) => {
       cropType: farmer.cropType,
       cropName: req.body.cropName,
       quantity: req.body.quantity,
-      price: req.body.price,
+      price: req.body.price, // Handled as string for compatibility
       imageUrl: req.file ? `/uploads/${req.file.filename}` : "",
       status: "pending",
       bids: [],
@@ -137,7 +137,6 @@ app.get("/api/dealer/crops", async (req, res) => {
   res.json(crops);
 });
 
-// 3. Connect to DB and Start Server
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log("MongoDB Connected");

@@ -8,44 +8,47 @@ router.post("/:cropId/set-bid-time", async (req, res) => {
   const { farmerId, startTime, endTime } = req.body;
 
   try {
-    // 1. Find the crop
     const crop = await Crop.findById(cropId);
     if (!crop) return res.status(404).json({ message: "Crop not found" });
 
-    // 2. CRITICAL FIX: Convert both IDs to strings for comparison
-    // This prevents the 'Unauthorized' error even if IDs match
     if (crop.farmerId.toString() !== farmerId.toString()) {
       return res.status(403).json({ 
         message: "Unauthorized: You are not the owner of this crop" 
       });
     }
 
-    // 3. Validate and Parse Dates
     const start = new Date(startTime);
     const end = new Date(endTime);
+    const now = new Date();
 
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
       return res.status(400).json({ message: "Invalid date format provided" });
     }
 
-    // 4. Update the document
+    // Determine status based on live comparison
+    let currentStatus = "pending";
+    if (now >= start && now <= end) {
+      currentStatus = "open";
+    } else if (now > end) {
+      currentStatus = "closed";
+    }
+
     crop.bidStartTime = start;
     crop.bidEndTime = end;
-    crop.status = "open";
+    crop.status = currentStatus;
 
     await crop.save();
 
-    // 5. Socket Notification
     const io = req.app.get("io");
     if (io) {
       io.to(cropId).emit("bidTimeUpdated", { 
         cropId, 
-        status: "open", 
+        status: currentStatus, 
         endTime: end 
       });
     }
 
-    res.json({ message: "Auction is now LIVE!", crop });
+    res.json({ message: `Auction is now ${currentStatus.toUpperCase()}!`, crop });
 
   } catch (err) {
     console.error("SET BID TIME ERROR:", err);
@@ -68,13 +71,14 @@ router.post("/bid/:cropId", async (req, res) => {
     if (!crop) return res.status(404).json({ message: "Crop not found" });
 
     const now = new Date();
+    const startTime = new Date(crop.bidStartTime);
+    const endTime = new Date(crop.bidEndTime);
     
-    // Check if bidding window is active
-    if (!crop.bidStartTime || now < crop.bidStartTime) {
+    if (!crop.bidStartTime || now < startTime) {
       return res.status(400).json({ message: "Bidding not started yet" });
     }
     
-    if (crop.bidEndTime && now > crop.bidEndTime) {
+    if (now > endTime) {
       if (crop.status !== "closed") {
         crop.status = "closed";
         await crop.save();
@@ -82,7 +86,6 @@ router.post("/bid/:cropId", async (req, res) => {
       return res.status(400).json({ message: "Bidding closed" });
     }
 
-    // Handle price string cleaning (e.g. "₹200" -> 200)
     const farmerBasePrice = parseFloat(crop.price?.toString().replace(/[^0-9.]/g, '')) || 0;
     
     let currentHighestBid = 0;
@@ -122,7 +125,6 @@ router.post("/bid/:cropId", async (req, res) => {
   }
 });
 
-// GET BIDS
 router.get("/bids/:cropId", async (req, res) => {
   try {
     const crop = await Crop.findById(req.params.cropId);

@@ -71,13 +71,16 @@ router.post("/bid/:cropId", async (req, res) => {
     if (!crop) return res.status(404).json({ message: "Crop not found" });
 
     const now = new Date();
+    // Ensure we are comparing actual Date objects
     const startTime = new Date(crop.bidStartTime);
     const endTime = new Date(crop.bidEndTime);
     
+    // 1. Check if bidding window hasn't started yet
     if (!crop.bidStartTime || now < startTime) {
       return res.status(400).json({ message: "Bidding not started yet" });
     }
     
+    // 2. Check if bidding window has already closed
     if (now > endTime) {
       if (crop.status !== "closed") {
         crop.status = "closed";
@@ -86,6 +89,7 @@ router.post("/bid/:cropId", async (req, res) => {
       return res.status(400).json({ message: "Bidding closed" });
     }
 
+    // Clean the price string if it contains currency symbols or commas
     const farmerBasePrice = parseFloat(crop.price?.toString().replace(/[^0-9.]/g, '')) || 0;
     
     let currentHighestBid = 0;
@@ -101,6 +105,7 @@ router.post("/bid/:cropId", async (req, res) => {
       });
     }
 
+    // Push the new bid with a server-side timestamp
     crop.bids.push({ 
       dealerId, 
       dealerName: dealerName || "Anonymous", 
@@ -110,6 +115,7 @@ router.post("/bid/:cropId", async (req, res) => {
     
     await crop.save();
 
+    // Sort bids by price (highest first) before emitting
     const sortedBids = [...crop.bids].sort((a, b) => b.pricePerKg - a.pricePerKg);
 
     const io = req.app.get("io");
@@ -125,6 +131,7 @@ router.post("/bid/:cropId", async (req, res) => {
   }
 });
 
+// GET ALL BIDS FOR A CROP
 router.get("/bids/:cropId", async (req, res) => {
   try {
     const crop = await Crop.findById(req.params.cropId);
@@ -133,7 +140,7 @@ router.get("/bids/:cropId", async (req, res) => {
     const sortedBids = [...bids].sort((a, b) => b.pricePerKg - a.pricePerKg);
     res.json({ crop, bids: sortedBids });
   } catch (err) {
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error fetching bids" });
   }
 });
 

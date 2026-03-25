@@ -35,11 +35,13 @@ const io = require("socket.io")(server, {
 
 app.set("io", io); 
 
+// Add "OPTIONS" to the methods array
 app.use(cors({
   origin: ["https://agrosetu-frontend.vercel.app", "http://localhost:3000"],
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], 
   credentials: true
 }));
+
 app.use(express.json());
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 

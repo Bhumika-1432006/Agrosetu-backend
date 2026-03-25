@@ -33,17 +33,17 @@ router.get("/bids/:cropId", async (req, res) => {
   }
 });
 
-// Update the bid end time to match your Model's "bidEndTime"
+// Update the bid end time
 router.put("/update-time/:cropId", async (req, res) => {
   const { cropId } = req.params;
-  const { bidEndTime } = req.body; // Change this to bidEndTime
+  const { bidEndTime } = req.body;
 
   try {
     const updatedCrop = await Crop.findByIdAndUpdate(
       cropId,
       { 
-        bidEndTime: new Date(bidEndTime), // Matching the schema field
-        status: "open"          // Usually, setting a time means the auction is now "open"
+        bidEndTime: new Date(bidEndTime), 
+        status: "open" 
       }, 
       { new: true }
     );
@@ -52,10 +52,17 @@ router.put("/update-time/:cropId", async (req, res) => {
       return res.status(404).json({ message: "Crop not found" });
     }
 
-    const io = req.app.get("io");
-    if (io) io.to(cropId).emit("bidTimeUpdated", { cropId, newTime: bidEndTime });
+    // Socket.io emission
+    try {
+        const io = req.app.get("io");
+        if (io) io.to(cropId).emit("bidTimeUpdated", { cropId, newTime: bidEndTime });
+    } catch (socketErr) {
+        console.error("Socket error:", socketErr);
+    }
 
+    // SUCCESS RESPONSE (Fixed this line)
     res.json({ message: "Bid time updated successfully", updatedCrop });
+
   } catch (err) {
     console.error("Update Bid Time Error:", err);
     res.status(500).json({ message: "Server error while updating bid time" });

@@ -31,7 +31,7 @@ cloudinary.config({
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: "agrosetu_crops", // This folder is created in Cloudinary automatically
+    folder: "agrosetu_crops",
     allowed_formats: ["jpg", "png", "jpeg"],
   },
 });
@@ -72,17 +72,49 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/auction", auctionRoutes);
 app.use("/api/bid", bidRoutes); 
 
-// Auth Routes (Signup/Signin) - Keep these as they were...
-app.post("/api/signup", async (req, res) => { /* ... existing code ... */ });
-app.post("/api/signin", async (req, res) => { /* ... existing code ... */ });
+// --- RESTORED AUTH ROUTES ---
+app.post("/api/signup", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const existingUser = await User.findOne({ email });
+    if (existingUser) return res.status(400).json({ message: "Email already registered." });
+    
+    const hashed = await bcrypt.hash(password, 10);
+    const user = new User({ ...req.body, password: hashed });
+    await user.save();
+    res.json({ message: "Signup successful" });
+  } catch (err) {
+    console.error("Signup Error:", err);
+    res.status(500).json({ message: "Signup failed" });
+  }
+});
 
-// --- UPDATED CROP UPLOAD ROUTE ---
+app.post("/api/signin", async (req, res) => {
+  try {
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) return res.status(400).json({ message: "User not found" });
+    
+    const match = await bcrypt.compare(req.body.password, user.password);
+    if (!match) return res.status(400).json({ message: "Invalid password" });
+    
+    res.json({ 
+      message: "Login success", 
+      role: user.role, 
+      userId: user._id, 
+      name: user.name 
+    });
+  } catch (err) {
+    console.error("Signin Error:", err);
+    res.status(500).json({ message: "Signin failed" });
+  }
+});
+
+// --- CROP UPLOAD ROUTE ---
 app.post("/api/farmer/crops", upload.single("image"), async (req, res) => {
   try {
     const farmer = await User.findById(req.body.farmerId);
     if (!farmer) return res.status(404).json({ message: "Farmer not found" });
 
-    // req.file.path now contains the full Cloudinary HTTPS URL
     const cropImageUrl = req.file ? req.file.path : "";
 
     const crop = new Crop({
@@ -94,7 +126,7 @@ app.post("/api/farmer/crops", upload.single("image"), async (req, res) => {
       cropName: req.body.cropName,
       quantity: req.body.quantity,
       price: req.body.price, 
-      imageUrl: cropImageUrl, // Saving the full cloud URL
+      imageUrl: cropImageUrl,
       status: "pending",
       bids: [],
     });

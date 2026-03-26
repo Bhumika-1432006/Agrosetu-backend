@@ -41,16 +41,18 @@ const upload = multer({ storage });
 const server = http.createServer(app);
 const io = require("socket.io")(server, {
   cors: { 
-    origin: ["https://agrosetu-frontend.vercel.app", "http://localhost:3000"],
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    origin: "*", // Allows socket connections from anywhere to prevent blocking
+    methods: ["GET", "POST"]
   }
 });
 
 app.set("io", io); 
 
+// --- UPDATED CORS CONFIGURATION ---
 app.use(cors({
   origin: ["https://agrosetu-frontend.vercel.app", "http://localhost:3000"],
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], 
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
 }));
 
@@ -72,7 +74,7 @@ app.use("/api/chat", chatRoutes);
 app.use("/api/auction", auctionRoutes);
 app.use("/api/bid", bidRoutes); 
 
-// --- RESTORED AUTH ROUTES ---
+// --- AUTH ROUTES ---
 app.post("/api/signup", async (req, res) => {
   try {
     const { email, password } = req.body;
